@@ -1,36 +1,21 @@
-export interface User {
-  id: number
-  name: string
-  email: string
-  password?: string
-  avatar?: string
-}
+export type TaskStatus = 'todo' | 'in-progress' | 'done';
+export type Priority = 'low' | 'medium' | 'high';
 
 export interface Task {
-  id: number
-  title: string
-  description: string
-  status: "todo" | "in-progress" | "done"
-  priority: "low" | "medium" | "high"
-  userId: number
-  createdAt: string
-  dueDate?: string
-  tags: string[]
+  id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: Priority;
+  dueDate: string;
+  createdAt: string;
+  userId?: string;
+  tags?: string[];
 }
 
-export interface Comment {
-  id: number
-  taskId: number
-  userId: number
-  content: string
-  createdAt: string
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
 }
-
-export interface AuthState {
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-}
-
-export type TaskStatus = "todo" | "in-progress" | "done"
-export type TaskPriority = "low" | "medium" | "high"

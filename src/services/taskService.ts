@@ -1,4 +1,4 @@
-import { Task, TaskStatus, Priority } from '../types';
+import type { Task, TaskStatus } from '../types';
 import mockData from '../mock/data.json';
 
 const STORAGE_KEY = 'taskflow_tasks_v1';
@@ -9,11 +9,11 @@ export class TaskService {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(mockData.tasks));
-        return mockData.tasks as Task[];
+        return mockData.tasks as unknown as Task[];
       }
       return JSON.parse(raw);
     } catch {
-      return (mockData.tasks as Task[]) || [];
+      return (mockData.tasks as unknown as Task[]) || [];
     }
   }
 
@@ -31,6 +31,8 @@ export class TaskService {
       ...task,
       id: `task-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      tags: task.tags || [],
+      userId: task.userId || 'user-1',
     };
     tasks.unshift(newTask);
     this.saveTasks(tasks);
