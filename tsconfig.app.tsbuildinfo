@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/setupTests.ts","./src/vite-env.d.ts","./src/__tests__/TaskFlow.test.tsx","./src/components/CreateTaskModal.tsx","./src/components/TaskCard.tsx","./src/components/common/Button.tsx","./src/components/common/Card.tsx","./src/components/common/Input.tsx","./src/services/taskService.ts","./src/types/index.ts"],"version":"6.0.3"}
