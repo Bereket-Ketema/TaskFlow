@@ -9,7 +9,11 @@ describe('TaskFlow Kanban App', () => {
 
   it('renders Kanban board columns and initial seed tasks', async () => {
     render(<App />);
-    expect(screen.getByText('TaskFlow')).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(screen.getByText('TaskFlow')).toBeInTheDocument();
+    });
+
     expect(screen.getByText('To Do')).toBeInTheDocument();
     expect(screen.getByText('In Progress')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
@@ -17,6 +21,11 @@ describe('TaskFlow Kanban App', () => {
 
   it('opens creation modal and creates a new task', async () => {
     render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('TaskFlow')).toBeInTheDocument();
+    });
+
     const newBtn = screen.getByRole('button', { name: /\+ new task/i });
     fireEvent.click(newBtn);
 
@@ -35,6 +44,11 @@ describe('TaskFlow Kanban App', () => {
 
   it('filters task cards by search query', async () => {
     render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByText('TaskFlow')).toBeInTheDocument();
+    });
+
     const searchInput = screen.getByPlaceholderText(/search tasks/i);
     fireEvent.change(searchInput, { target: { value: 'Nonexistent query' } });
 
