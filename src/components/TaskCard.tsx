@@ -4,6 +4,8 @@ import { Button } from './common/Button';
 
 interface TaskCardProps {
   task: Task;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
   onStatusChange: (id: string, nextStatus: TaskStatus) => void;
   onDelete: (id: string) => void;
 }
@@ -14,7 +16,13 @@ const NEXT_STATUS_MAP: Record<TaskStatus, TaskStatus | null> = {
   done: null,
 };
 
-export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
+export function TaskCard({
+  task,
+  isSelected = false,
+  onToggleSelect,
+  onStatusChange,
+  onDelete,
+}: TaskCardProps) {
   const nextStatus = NEXT_STATUS_MAP[task.status];
 
   const priorityColor =
@@ -25,9 +33,22 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
       : 'bg-slate-50 text-slate-700 border-slate-200';
 
   return (
-    <Card className="p-4 space-y-3 shadow-sm hover:shadow transition-shadow">
+    <Card
+      className={`p-4 space-y-3 shadow-sm hover:shadow transition-all ${
+        isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
-        <h4 className="font-semibold text-sm leading-snug text-slate-900">{task.title}</h4>
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect?.(task.id)}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            aria-label={`Select task ${task.title}`}
+          />
+          <h4 className="font-semibold text-sm leading-snug text-slate-900">{task.title}</h4>
+        </div>
         <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${priorityColor}`}>
           {task.priority}
         </span>

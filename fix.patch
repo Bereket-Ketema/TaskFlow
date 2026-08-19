@@ -1,0 +1,574 @@
+diff --git a/src/App.tsx b/src/App.tsx
+index aa2d98f..e1f35f6 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState, useMemo } from 'react';
++import { useEffect, useState, useMemo, useCallback } from 'react';
+ import type { ChangeEvent } from 'react';
+ import type { Task, TaskStatus, Priority } from './types';
+ import { TaskService } from './services/taskService';
+@@ -18,6 +18,7 @@ export default function App() {
+   const [search, setSearch] = useState('');
+   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
+   const [isModalOpen, setIsModalOpen] = useState(false);
++  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+ 
+   useEffect(() => {
+     let isSubscribed = true;
+@@ -31,18 +32,62 @@ export default function App() {
+     };
+   }, []);
+ 
+-  const handleStatusChange = async (id: string, status: TaskStatus) => {
++  const handleStatusChange = useCallback(async (id: string, status: TaskStatus) => {
+     await TaskService.updateTaskStatus(id, status);
+     const refreshed = await TaskService.getAllTasks();
+     setTasks(refreshed);
+-  };
++  }, []);
+ 
+-  const handleDelete = async (id: string) => {
++  const handleDelete = useCallback(async (id: string) => {
+     await TaskService.deleteTask(id);
++    setSelectedTaskIds((prev) => {
++      if (!prev.has(id)) return prev;
++      const next = new Set(prev);
++      next.delete(id);
++      return next;
++    });
++    const refreshed = await TaskService.getAllTasks();
++    setTasks(refreshed);
++  }, []);
++
++  const handleToggleSelect = useCallback((id: string) => {
++    setSelectedTaskIds((prev) => {
++      const next = new Set(prev);
++      if (next.has(id)) {
++        next.delete(id);
++      } else {
++        next.add(id);
++      }
++      return next;
++    });
++  }, []);
++
++  const handleBatchAdvance = async () => {
++    const selectedList = tasks.filter((t) => selectedTaskIds.has(t.id));
++    for (const task of selectedList) {
++      if (task.status === 'todo') {
++        await TaskService.updateTaskStatus(task.id, 'in-progress');
++      } else if (task.status === 'in-progress') {
++        await TaskService.updateTaskStatus(task.id, 'done');
++      }
++    }
++    const refreshed = await TaskService.getAllTasks();
++    setTasks(refreshed);
++  };
++
++  const handleBatchDelete = async () => {
++    for (const id of selectedTaskIds) {
++      await TaskService.deleteTask(id);
++    }
++    setSelectedTaskIds(new Set());
+     const refreshed = await TaskService.getAllTasks();
+     setTasks(refreshed);
+   };
+ 
++  const handleClearSelection = () => {
++    setSelectedTaskIds(new Set());
++  };
++
+   const handleCreate = async (data: Omit<Task, 'id' | 'createdAt'>) => {
+     await TaskService.createTask(data);
+     const refreshed = await TaskService.getAllTasks();
+@@ -59,6 +104,8 @@ export default function App() {
+     });
+   }, [tasks, search, priorityFilter]);
+ 
++  const selectedCount = selectedTaskIds.size;
++
+   return (
+     <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-900">
+       <div className="max-w-7xl mx-auto space-y-6">
+@@ -87,6 +134,29 @@ export default function App() {
+             <option value="medium">Medium Priority</option>
+             <option value="high">High Priority</option>
+           </select>
++
++          {selectedCount > 0 && (
++            <div className="flex items-center gap-2 ml-auto bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-md text-xs text-blue-900">
++              <span className="font-semibold">{selectedCount} selected</span>
++              <Button
++                variant="outline"
++                className="h-7 px-2 text-xs bg-white"
++                onClick={handleBatchAdvance}
++              >
++                Advance Status
++              </Button>
++              <Button
++                variant="destructive"
++                className="h-7 px-2 text-xs"
++                onClick={handleBatchDelete}
++              >
++                Delete
++              </Button>
++              <Button variant="ghost" className="h-7 px-2 text-xs" onClick={handleClearSelection}>
++                Clear
++              </Button>
++            </div>
++          )}
+         </div>
+ 
+         <main className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+@@ -110,6 +180,8 @@ export default function App() {
+                       <TaskCard
+                         key={t.id}
+                         task={t}
++                        isSelected={selectedTaskIds.has(t.id)}
++                        onToggleSelect={handleToggleSelect}
+                         onStatusChange={handleStatusChange}
+                         onDelete={handleDelete}
+                       />
+diff --git a/src/component note/Counter.tsx b/src/component note/Counter.tsx
+deleted file mode 100644
+index c9ef715..0000000
+--- a/src/component note/Counter.tsx	
++++ /dev/null
+@@ -1,53 +0,0 @@
+-// src/components/Counter.tsx
+-import { useState, useEffect } from 'react';
+-
+-interface CounterProps {
+-  initialValue?: number;
+-  step?: number;
+-}
+-
+-export const Counter: React.FC<CounterProps> = ({ 
+-  initialValue = 0, 
+-  step = 1 
+-}) => {
+-  const [count, setCount] = useState<number>(initialValue);
+-  const [history, setHistory] = useState<number[]>([]);
+-
+-  useEffect(() => {
+-    setHistory(prev => [...prev, count]);
+-  }, [count]);
+-
+-  const increment = (): void => {
+-    setCount(prev => prev + step);
+-  };
+-
+-  const decrement = (): void => {
+-    setCount(prev => prev - step);
+-  };
+-
+-  const reset = (): void => {
+-    setCount(initialValue);
+-    setHistory([]);
+-  };
+-
+-  return (
+-    <div className="counter">
+-      <h2>Count: {count}</h2>
+-      <div>
+-        <button onClick={decrement}>-</button>
+-        <button onClick={increment}>+</button>
+-        <button onClick={reset}>Reset</button>
+-      </div>
+-      <div>
+-        <h3>History:</h3>
+-        <ul>
+-          {history.map((value, index) => (
+-            <li key={index}>{value}</li>
+-          ))}
+-        </ul>
+-      </div>
+-    </div>
+-  );
+-};
+-
+-export default Counter;
+\ No newline at end of file
+diff --git a/src/component note/Practice.tsx b/src/component note/Practice.tsx
+deleted file mode 100644
+index ef3eb46..0000000
+--- a/src/component note/Practice.tsx	
++++ /dev/null
+@@ -1,36 +0,0 @@
+-interface Data<T> {
+-  items: T[]
+-  key: keyof T
+-  header: string
+-}
+-
+-function Table<T>({ data, columns }: TableProps<T>) {
+-  return (
+-    <table>
+-      <thead>
+-        <tr>
+-          {/* Step 1: Render headers */}
+-          {columns.map((col) => (
+-            <th key={col.key as string}>
+-              {col.header}  // Shows: "ID", "Full Name", "Email Address"
+-            </th>
+-          ))}
+-        </tr>
+-      </thead>
+-      <tbody>
+-        {/* Step 2: Loop through data */}
+-        {data.map((item) => (
+-          <tr>
+-            {/* Step 3: For each item, show each column */}
+-            {columns.map((col) => (
+-              <td>
+-                {/* Use the column's key to get the value */}
+-                {item[col.key]}  // Gets: item.id, item.name, item.email
+-              </td>
+-            ))}
+-          </tr>
+-        ))}
+-      </tbody>
+-    </table>
+-  );
+-}
+\ No newline at end of file
+diff --git a/src/component note/Props.tsx b/src/component note/Props.tsx
+deleted file mode 100644
+index 8366293..0000000
+--- a/src/component note/Props.tsx	
++++ /dev/null
+@@ -1,40 +0,0 @@
+-interface ButtonProps {
+-  label: string
+-  onClick: () => void
+-  variant?: "primary" | "secondary" | "danger"
+-  disabled?: boolean
+-}
+-
+-export function Button({ label, onClick, variant = "primary", disabled = false }: ButtonProps) {
+-  return (
+-    <button
+-      onClick={onClick}
+-      disabled={disabled}
+-      className={`btn btn-${variant}`}
+-    >
+-      {label}
+-    </button>
+-  )
+-}
+-
+-//with childs
+-
+-interface CardProps {
+-  title: string
+-  children: React.ReactNode  // Can be any React renderable content
+-}
+-
+-export function Card({ title, children }: CardProps) {
+-  return (
+-    <div className="card">
+-      <h2>{title}</h2>
+-      <div className="card-content">{children}</div>
+-    </div>
+-  )
+-}
+-
+-// Usage:
+-<Card title="Welcome">
+-  <p>This is the content</p>
+-  <Button label="Click me" onClick={() => {}} />
+-</Card>
+\ No newline at end of file
+diff --git a/src/component note/Useref.tsx b/src/component note/Useref.tsx
+deleted file mode 100644
+index 2b8a4c9..0000000
+--- a/src/component note/Useref.tsx	
++++ /dev/null
+@@ -1,51 +0,0 @@
+-import { useRef, useState } from "react"
+-export default function InputFocus() {
+-  const inputRef = useRef<HTMLInputElement>(null)
+-
+-  const focusInput = () => {
+-    // Check if ref exists before using
+-    if (inputRef.current) {
+-      inputRef.current.focus()
+-    }
+-
+-    // Or use optional chaining
+-    inputRef.current?.focus()
+-  }
+-
+-  return (
+-    <div>
+-      <input ref={inputRef} type="text" placeholder="Type something..." />
+-      <button onClick={focusInput}>Focus Input</button>
+-    </div>
+-  )
+-}
+-
+-// For Useref for mutable values
+-
+-export function Timer() {
+-  const [count, setCount] = useState(0)
+-  const intervalRef = useRef<number | undefined>(undefined)
+-
+-  const startTimer = () => {
+-    if (intervalRef.current) return // Already running
+-
+-    intervalRef.current = setInterval(() => {
+-      setCount(prev => prev + 1)
+-    }, 1000)
+-  }
+-
+-  const stopTimer = () => {
+-    if (intervalRef.current) {
+-      clearInterval(intervalRef.current)
+-      intervalRef.current = undefined
+-    }
+-  }
+-
+-  return (
+-    <div>
+-      <p>Count: {count}</p>
+-      <button onClick={startTimer}>Start</button>
+-      <button onClick={stopTimer}>Stop</button>
+-    </div>
+-  )
+-}
+\ No newline at end of file
+diff --git a/src/component note/Usestate.tsx b/src/component note/Usestate.tsx
+deleted file mode 100644
+index e1c3362..0000000
+--- a/src/component note/Usestate.tsx	
++++ /dev/null
+@@ -1,59 +0,0 @@
+-// TypeScript infers from initial value
+-const [count, setCount] = useState(0)  // count is number
+-
+-// Explicit type for nullable state
+-const [user, setUser] = useState<User | null>(null)
+-
+-// Explicit type for union state
+-const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+-
+-// with complex objects
+-
+-interface User {
+-  id: number
+-  name: string
+-  email: string
+-  age?: number
+-}
+-
+-function UserProfile() {
+-  const [user, setUser] = useState<User | null>(null)
+-  const [loading, setLoading] = useState(true)
+-
+-  const fetchUser = async () => {
+-    setLoading(true)
+-    try {
+-      const response = await fetch("/api/user")
+-      const data: User = await response.json()
+-      setUser(data)
+-    } finally {
+-      setLoading(false)
+-    }
+-  }
+-
+-  if (loading) return <div>Loading...</div>
+-  if (!user) return <div>No user found</div>
+-
+-  return (
+-    <div>
+-      <h1>{user.name}</h1>
+-      <p>Email: {user.email}</p>
+-      {user.age && <p>Age: {user.age}</p>}
+-    </div>
+-  )
+-}
+-
+-// with arrays
+-
+-const [items, setItems] = useState<string[]>([])
+-const [numbers, setNumbers] = useState<number[]>([1, 2, 3])
+-const [users, setUsers] = useState<User[]>([])
+-
+-// Updating arrays
+-const addItem = (item: string) => {
+-  setItems(prev => [...prev, item])
+-}
+-
+-const removeItem = (index: number) => {
+-  setItems(prev => prev.filter((_, i) => i !== index))
+-}
+\ No newline at end of file
+diff --git a/src/component note/function.tsx b/src/component note/function.tsx
+deleted file mode 100644
+index 0b9e871..0000000
+--- a/src/component note/function.tsx	
++++ /dev/null
+@@ -1,47 +0,0 @@
+-interface Props {
+-  name: string
+-  age: number
+-}
+-
+-export function UseCard({name, age}: Props) {
+-  return (
+-    <div>
+-      <h2>{name}</h2>
+-      <h2>Age: {age}</h2>
+-    </div>
+-  )
+-}
+-
+-//Arrow function with inferred return
+-export const UseCards = ({name, age}: Props) => {
+-  return (
+-    <div>
+-      <h2>{name}</h2>
+-      <h2>Age: {age}</h2>
+-    </div>
+-  )
+-}
+-
+-//Arrow function with explicit type
+-export const UserCard: React.FC<Props> = ({ name, age }) => {
+-  return (
+-    <div>
+-      <h2>{name}</h2>
+-      <p>Age: {age}</p>
+-    </div>
+-  )
+-}
+-
+-//component return type
+-function Component(): JSX.Element {
+-  return <div>Hello</div>
+-}
+-
+-function Wrapper({ children }: { children: React.ReactNode }): JSX.Element {
+-  return <div className="wrapper">{children}</div>
+-}
+-
+-function ConditionalComponent({ show }: { show: boolean }): JSX.Element | null {
+-  if (!show) return null
+-  return <div>Content</div>
+-}
+\ No newline at end of file
+diff --git a/src/component note/generic.tsx b/src/component note/generic.tsx
+deleted file mode 100644
+index b1367e5..0000000
+--- a/src/component note/generic.tsx	
++++ /dev/null
+@@ -1,55 +0,0 @@
+-interface ListProps<T> {
+-  items: T[]
+-  renderItem: (item: T, index: number) => React.ReactNode
+-  keyExtractor: (item: T) => string | number
+-}
+-
+-function List<T>({ items, renderItem, keyExtractor }: ListProps<T>) {
+-  return (
+-    <ul>
+-      {items.map((item, index) => (
+-        <li key={keyExtractor(item)}>
+-          {renderItem(item, index)}
+-        </li>
+-      ))}
+-    </ul>
+-  )
+-}
+-
+-// Usage:
+-interface User {
+-  id: number
+-  name: string
+-  email: string
+-}
+-
+-const users: User[] = [
+-  { id: 1, name: "John", email: "john@example.com" },
+-  { id: 2, name: "Jane", email: "jane@example.com" },
+-]
+-
+-function App() {
+-  return (
+-    <List
+-      items={users}  // Step 1: You pass your data
+-      keyExtractor={(user) => user.id}  // Step 2: Tell how to get IDs
+-      renderItem={(user) => (  // Step 3: Tell how to display
+-        <div>
+-          <strong>{user.name}</strong>
+-          <span>{user.email}</span>
+-        </div>
+-      )}
+-    />
+-  )
+-}
+-
+-//This creates a reusable list component that can
+-// work with any type of data. Instead of creating 
+-// separate lists for users, products, comments, etc.,
+-//  you create one flexible list that works with everything!
+-
+-// This is like saying: "I'll work with any type, call it 'T'"
+-function List<T>({ items, renderItem, keyExtractor }: ListProps<T>) {
+-  // ...
+-}
+-
+diff --git a/src/components/TaskCard.tsx b/src/components/TaskCard.tsx
+index 7e7672e..9b68d6d 100644
+--- a/src/components/TaskCard.tsx
++++ b/src/components/TaskCard.tsx
+@@ -4,6 +4,8 @@ import { Button } from './common/Button';
+ 
+ interface TaskCardProps {
+   task: Task;
++  isSelected?: boolean;
++  onToggleSelect?: (id: string) => void;
+   onStatusChange: (id: string, nextStatus: TaskStatus) => void;
+   onDelete: (id: string) => void;
+ }
+@@ -14,7 +16,13 @@ const NEXT_STATUS_MAP: Record<TaskStatus, TaskStatus | null> = {
+   done: null,
+ };
+ 
+-export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
++export function TaskCard({
++  task,
++  isSelected = false,
++  onToggleSelect,
++  onStatusChange,
++  onDelete,
++}: TaskCardProps) {
+   const nextStatus = NEXT_STATUS_MAP[task.status];
+ 
+   const priorityColor =
+@@ -25,9 +33,22 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
+       : 'bg-slate-50 text-slate-700 border-slate-200';
+ 
+   return (
+-    <Card className="p-4 space-y-3 shadow-sm hover:shadow transition-shadow">
++    <Card
++      className={`p-4 space-y-3 shadow-sm hover:shadow transition-all ${
++        isSelected ? 'ring-2 ring-blue-500 bg-blue-50/20' : ''
++      }`}
++    >
+       <div className="flex items-start justify-between gap-2">
+-        <h4 className="font-semibold text-sm leading-snug text-slate-900">{task.title}</h4>
++        <div className="flex items-center gap-2">
++          <input
++            type="checkbox"
++            checked={isSelected}
++            onChange={() => onToggleSelect?.(task.id)}
++            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
++            aria-label={`Select task ${task.title}`}
++          />
++          <h4 className="font-semibold text-sm leading-snug text-slate-900">{task.title}</h4>
++        </div>
+         <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${priorityColor}`}>
+           {task.priority}
+         </span>

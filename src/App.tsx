@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Task, TaskStatus, Priority } from './types';
 import { TaskService } from './services/taskService';
@@ -18,6 +18,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let isSubscribed = true;
@@ -31,16 +32,60 @@ export default function App() {
     };
   }, []);
 
-  const handleStatusChange = async (id: string, status: TaskStatus) => {
+  const handleStatusChange = useCallback(async (id: string, status: TaskStatus) => {
     await TaskService.updateTaskStatus(id, status);
+    const refreshed = await TaskService.getAllTasks();
+    setTasks(refreshed);
+  }, []);
+
+  const handleDelete = useCallback(async (id: string) => {
+    await TaskService.deleteTask(id);
+    setSelectedTaskIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    const refreshed = await TaskService.getAllTasks();
+    setTasks(refreshed);
+  }, []);
+
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBatchAdvance = async () => {
+    const selectedList = tasks.filter((t) => selectedTaskIds.has(t.id));
+    for (const task of selectedList) {
+      if (task.status === 'todo') {
+        await TaskService.updateTaskStatus(task.id, 'in-progress');
+      } else if (task.status === 'in-progress') {
+        await TaskService.updateTaskStatus(task.id, 'done');
+      }
+    }
     const refreshed = await TaskService.getAllTasks();
     setTasks(refreshed);
   };
 
-  const handleDelete = async (id: string) => {
-    await TaskService.deleteTask(id);
+  const handleBatchDelete = async () => {
+    for (const id of selectedTaskIds) {
+      await TaskService.deleteTask(id);
+    }
+    setSelectedTaskIds(new Set());
     const refreshed = await TaskService.getAllTasks();
     setTasks(refreshed);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedTaskIds(new Set());
   };
 
   const handleCreate = async (data: Omit<Task, 'id' | 'createdAt'>) => {
@@ -58,6 +103,8 @@ export default function App() {
       return matchesSearch && matchesPriority;
     });
   }, [tasks, search, priorityFilter]);
+
+  const selectedCount = selectedTaskIds.size;
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 md:p-10 font-sans text-slate-900">
@@ -87,6 +134,29 @@ export default function App() {
             <option value="medium">Medium Priority</option>
             <option value="high">High Priority</option>
           </select>
+
+          {selectedCount > 0 && (
+            <div className="flex items-center gap-2 ml-auto bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-md text-xs text-blue-900">
+              <span className="font-semibold">{selectedCount} selected</span>
+              <Button
+                variant="outline"
+                className="h-7 px-2 text-xs bg-white"
+                onClick={handleBatchAdvance}
+              >
+                Advance Status
+              </Button>
+              <Button
+                variant="destructive"
+                className="h-7 px-2 text-xs"
+                onClick={handleBatchDelete}
+              >
+                Delete
+              </Button>
+              <Button variant="ghost" className="h-7 px-2 text-xs" onClick={handleClearSelection}>
+                Clear
+              </Button>
+            </div>
+          )}
         </div>
 
         <main className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
@@ -110,6 +180,8 @@ export default function App() {
                       <TaskCard
                         key={t.id}
                         task={t}
+                        isSelected={selectedTaskIds.has(t.id)}
+                        onToggleSelect={handleToggleSelect}
                         onStatusChange={handleStatusChange}
                         onDelete={handleDelete}
                       />
